@@ -94,4 +94,20 @@ lemma fold_cond_nodes: "nodes (fold_cond c a b) \<le> Suc (nodes c + nodes a + n
 theorem optimise_size: "nodes (optimise e) \<le> nodes e"
   by (induction e) (auto intro: order_trans[OF fold_binary_nodes] order_trans[OF fold_cond_nodes])
 
+lemma fold_binary_idempotent:
+  "optimise a = a \<Longrightarrow> optimise b = b \<Longrightarrow>
+    optimise (fold_binary op a b) = fold_binary op a b"
+  by (cases a; cases b) auto
+
+lemma fold_cond_idempotent:
+  "optimise c = c \<Longrightarrow> optimise a = a \<Longrightarrow> optimise b = b \<Longrightarrow>
+    optimise (fold_cond c a b) = fold_cond c a b"
+  by (cases c) auto
+
+theorem optimise_idempotent: "optimise (optimise e) = optimise e"
+  by (induction e) (auto intro: fold_binary_idempotent fold_cond_idempotent)
+
+theorem scoped_weaken: "scoped n e \<Longrightarrow> n \<le> m \<Longrightarrow> scoped m e"
+  by (induction e arbitrary: n m) auto
+
 end
