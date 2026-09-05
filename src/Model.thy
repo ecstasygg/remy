@@ -44,7 +44,12 @@ fun scoped :: "nat \<Rightarrow> expression \<Rightarrow> bool" where
 
 fun fold_binary :: "operator \<Rightarrow> expression \<Rightarrow> expression \<Rightarrow> expression" where
   "fold_binary op (Literal a) (Literal b) = Literal (operate op a b)"
-| "fold_binary op a b = Binary op a b"
+| "fold_binary op a b = (if b = Literal 0 \<and> op \<in> {Add,Sub,Or,Xor,Shl,Shr} then a
+    else if a = Literal 0 \<and> op \<in> {Add,Or,Xor} then b
+    else if b = Literal 1 \<and> op = Mul then a
+    else if a = Literal 1 \<and> op = Mul then b
+    else if b = Literal (-1) \<and> op = And then a
+    else if a = Literal (-1) \<and> op = And then b else Binary op a b)"
 
 fun fold_cond :: "expression \<Rightarrow> expression \<Rightarrow> expression \<Rightarrow> expression" where
   "fold_cond (Literal c) a b = (if c = 0 then b else a)"
@@ -58,7 +63,7 @@ fun optimise :: "expression \<Rightarrow> expression" where
 
 lemma fold_binary_value:
   "evaluate (fold_binary op a b) env inputs = operate op (evaluate a env inputs) (evaluate b env inputs)"
-  by (cases a; cases b) auto
+  by (cases op; cases a; cases b) auto
 
 lemma fold_cond_value:
   "evaluate (fold_cond c a b) env inputs = (if evaluate c env inputs = 0 then evaluate b env inputs else evaluate a env inputs)"

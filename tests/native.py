@@ -65,6 +65,8 @@ def main():
         raise RuntimeError("native differential tests require an x86-64 Linux host")
     rng = random.Random(0x52454D59)
     cases = [(op, "x", "y") for op in OPERATORS]
+    cases += [(op, "x", 0) for op in ("+", "-", "or", "xor", "shl", "shr")]
+    cases += [("*", "x", 1), ("*", 1, "x"), ("and", "x", MASK)]
     cases += [("let", "a", ("+", "x", 3), ("+", "y", ("let", "b", "t", ("*", "a", "b")))),
               ("let", "x", "y", ("if", "t", ("+", "x", 1), ("-", "x", 1)))]
     cases += [generate(rng, 5, ["x", "y", "t"]) for _ in range(117)]

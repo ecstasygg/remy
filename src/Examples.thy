@@ -27,6 +27,14 @@ lemma constant_fold:
   "optimise (Binary Add (Literal (-1)) (Literal 1)) = Literal 0"
   by eval
 
+lemma neutral_arithmetic:
+  "optimise (Binary Mul (Binary Add (Input X) (Literal 0)) (Literal 1)) = Input X"
+  by eval
+
+lemma neutral_bits:
+  "optimise (Binary And (Binary Xor (Input Y) (Literal 0)) (Literal (-1))) = Input Y"
+  by eval
+
 lemma dead_branch:
   "optimise (Cond (Literal 0) (Input X) (Input Y)) = Input Y"
   by eval
