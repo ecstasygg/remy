@@ -49,7 +49,11 @@ fun fold_binary :: "operator \<Rightarrow> expression \<Rightarrow> expression \
     else if b = Literal 1 \<and> op = Mul then a
     else if a = Literal 1 \<and> op = Mul then b
     else if b = Literal (-1) \<and> op = And then a
-    else if a = Literal (-1) \<and> op = And then b else Binary op a b)"
+    else if a = Literal (-1) \<and> op = And then b
+    else if b = Literal 0 \<and> op \<in> {Mul,And} then Literal 0
+    else if a = Literal 0 \<and> op \<in> {Mul,And,Shl,Shr} then Literal 0
+    else if b = Literal (-1) \<and> op = Or then Literal (-1)
+    else if a = Literal (-1) \<and> op = Or then Literal (-1) else Binary op a b)"
 
 fun fold_cond :: "expression \<Rightarrow> expression \<Rightarrow> expression \<Rightarrow> expression" where
   "fold_cond (Literal c) a b = (if c = 0 then b else a)"

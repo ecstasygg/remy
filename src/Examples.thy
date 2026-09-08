@@ -35,6 +35,14 @@ lemma neutral_bits:
   "optimise (Binary And (Binary Xor (Input Y) (Literal 0)) (Literal (-1))) = Input Y"
   by eval
 
+lemma absorbing_arithmetic:
+  "optimise (Binary Mul (Input X) (Literal 0)) = Literal 0"
+  by eval
+
+lemma absorbing_bits:
+  "optimise (Binary Or (Binary And (Input Y) (Literal 0)) (Literal (-1))) = Literal (-1)"
+  by eval
+
 lemma dead_branch:
   "optimise (Cond (Literal 0) (Input X) (Input Y)) = Input Y"
   by eval
