@@ -57,7 +57,7 @@ fun fold_binary :: "operator \<Rightarrow> expression \<Rightarrow> expression \
 
 fun fold_cond :: "expression \<Rightarrow> expression \<Rightarrow> expression \<Rightarrow> expression" where
   "fold_cond (Literal c) a b = (if c = 0 then b else a)"
-| "fold_cond c a b = Cond c a b"
+| "fold_cond c a b = (if a = b then a else Cond c a b)"
 
 fun optimise :: "expression \<Rightarrow> expression" where
   "optimise (Binary op a b) = fold_binary op (optimise a) (optimise b)"

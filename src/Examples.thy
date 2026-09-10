@@ -47,6 +47,10 @@ lemma dead_branch:
   "optimise (Cond (Literal 0) (Input X) (Input Y)) = Input Y"
   by eval
 
+lemma equal_branches:
+  "optimise (Cond (Input T) (Input X) (Input X)) = Input X"
+  by eval
+
 lemma literal_code:
   "executable (Literal 42) = [72,184,42,0,0,0,0,0,0,0,80,88,195]"
   by eval
