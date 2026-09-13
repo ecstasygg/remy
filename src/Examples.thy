@@ -51,6 +51,11 @@ lemma equal_branches:
   "optimise (Cond (Input T) (Input X) (Input X)) = Input X"
   by eval
 
+lemma stack_bound_tight:
+  "bounded 2 (compile (Binary Add (Input X) (Input Y)) []) 0 \<and>
+    \<not> bounded 1 (compile (Binary Add (Input X) (Input Y)) []) 0"
+  by eval
+
 lemma literal_code:
   "executable (Literal 42) = [72,184,42,0,0,0,0,0,0,0,80,88,195]"
   by eval

@@ -63,7 +63,7 @@ definition prepare :: "string \<Rightarrow> expression option" where
     Option.bind (parse 128 [] (lex s [] [])) (\<lambda>(e,rest).
       if rest = [] \<and> scoped 0 e \<and> nodes e \<le> 4096 then
         let code = compile (optimise e) [] in
-        if check code 0 = Some 1 \<and> bounded 512 code 0 \<and> list_all encodable (native code)
+        if check code 0 = Some 1 \<and> demand (optimise e) \<le> 512 \<and> list_all encodable (native code)
         then Some e else None else None))"
 
 lemma prepare_scoped: "prepare s = Some e \<Longrightarrow> scoped 0 e"
@@ -71,7 +71,7 @@ lemma prepare_scoped: "prepare s = Some e \<Longrightarrow> scoped 0 e"
 
 lemma prepare_bounded:
   "prepare s = Some e \<Longrightarrow> bounded 512 (compile (optimise e) []) 0"
-  by (auto simp: prepare_def Let_def split: if_splits bind_splits prod.splits)
+  by (auto simp: prepare_def Let_def closed_demand optimise_scoped split: if_splits bind_splits prod.splits)
 
 lemma prepare_encodable:
   "prepare s = Some e \<Longrightarrow> list_all encodable (native (compile (optimise e) []))"

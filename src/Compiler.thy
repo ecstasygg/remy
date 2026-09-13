@@ -179,6 +179,37 @@ next
   then show ?case by (simp add: check_append list_all_iff)
 qed
 
+theorem compiled_demand:
+  assumes "scoped (length slots) e" "list_all (\<lambda>i. i < n) slots"
+  shows "bounded limit (compile e slots) n \<longleftrightarrow> n + demand e \<le> limit"
+  using assms
+proof (induction e arbitrary: slots n)
+  case (Literal v)
+  then show ?case by auto
+next
+  case (Input i)
+  then show ?case by auto
+next
+  case (Variable i)
+  then show ?case by (auto simp: list_all_length)
+next
+  case (Binary op a b)
+  then show ?case using demand_positive[of a] demand_positive[of b]
+    by (auto simp: bounded_append compiled_height list_all_iff max_def; arith)
+next
+  case (Cond c a b)
+  then show ?case using demand_positive[of c] demand_positive[of a] demand_positive[of b]
+    by (auto simp: bounded_append compiled_height list_all_iff max_def; arith)
+next
+  case (Let a b)
+  then show ?case using demand_positive[of a] demand_positive[of b]
+    by (auto simp: bounded_append compiled_height list_all_iff max_def; arith)
+qed
+
+corollary closed_demand:
+  "scoped 0 e \<Longrightarrow> bounded limit (compile e []) 0 \<longleftrightarrow> demand e \<le> limit"
+  using compiled_demand[where slots="[]" and n=0] by simp
+
 fun snapshots :: "(input \<Rightarrow> pixel) \<Rightarrow> instruction list \<Rightarrow> pixel list \<Rightarrow> (pixel list list) option" where
   "snapshots inputs [] s = Some [s]"
 | "snapshots inputs (i # code) s = Option.bind (step inputs i s)
