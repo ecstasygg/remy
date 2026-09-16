@@ -26,6 +26,9 @@ fun lookup :: "string \<Rightarrow> string list \<Rightarrow> nat option" where
   "lookup name [] = None"
 | "lookup name (x # xs) = (if name = x then Some 0 else map_option Suc (lookup name xs))"
 
+lemma lookup_bound: "lookup name names = Some i \<Longrightarrow> i < length names"
+  by (induction names arbitrary: i) (auto split: if_splits option.splits)
+
 fun operator :: "string \<Rightarrow> operator option" where
   "operator s = (if s = ''+'' then Some Add else if s = ''-'' then Some Sub else if s = ''*'' then Some Mul
     else if s = ''and'' then Some And else if s = ''or'' then Some Or else if s = ''xor'' then Some Xor
@@ -36,9 +39,15 @@ definition atom :: "string list \<Rightarrow> string \<Rightarrow> expression op
     if s = ''x'' then Some (Input X) else if s = ''y'' then Some (Input Y) else if s = ''t'' then Some (Input T)
     else map_option (Literal \<circ> word_of_nat) (number s))"
 
+lemma atom_scoped: "atom names s = Some e \<Longrightarrow> scoped (length names) e"
+  by (auto simp: atom_def split: option.splits if_splits dest: lookup_bound)
+
 fun close :: "expression \<Rightarrow> string list \<Rightarrow> (expression \<times> string list) option" where
   "close e (s # rest) = (if s = '')'' then Some (e,rest) else None)"
 | "close e [] = None"
+
+lemma close_expression: "close e tokens = Some (a,rest) \<Longrightarrow> a = e"
+  by (cases tokens) (auto split: if_splits)
 
 function parse :: "nat \<Rightarrow> string list \<Rightarrow> string list \<Rightarrow> (expression \<times> string list) option" where
   "parse fuel names tokens = (if fuel = 0 then None else case tokens of [] \<Rightarrow> None | s # rest \<Rightarrow>
@@ -58,20 +67,35 @@ function parse :: "nat \<Rightarrow> string list \<Rightarrow> string list \<Rig
   by pat_completeness auto
 termination by (relation "measure (\<lambda>(fuel,names,tokens). fuel)") auto
 
+declare parse.simps [simp del]
+
+theorem parse_scoped:
+  "parse fuel names tokens = Some (e,rest) \<Longrightarrow> scoped (length names) e"
+proof (induction fuel arbitrary: names tokens e rest)
+  case 0
+  then show ?case by (subst (asm) parse.simps) auto
+next
+  case (Suc fuel)
+  from Suc.prems show ?case
+    by (subst (asm) parse.simps)
+      (auto simp del: operator.simps dest: atom_scoped split: list.splits if_splits bind_splits option.splits prod.splits;
+        drule close_expression; auto dest: Suc.IH)
+qed
+
 definition prepare :: "string \<Rightarrow> expression option" where
   "prepare s = (if \<not> list_all (\<lambda>c. nat_of_char c < 128) s then None else
     Option.bind (parse 128 [] (lex s [] [])) (\<lambda>(e,rest).
-      if rest = [] \<and> scoped 0 e \<and> nodes e \<le> 4096 then
+      if rest = [] \<and> nodes e \<le> 4096 then
         let code = compile (optimise e) [] in
         if check code 0 = Some 1 \<and> demand (optimise e) \<le> 512 \<and> list_all encodable (native code)
         then Some e else None else None))"
 
 lemma prepare_scoped: "prepare s = Some e \<Longrightarrow> scoped 0 e"
-  by (auto simp: prepare_def Let_def split: if_splits bind_splits prod.splits)
+  by (auto simp: prepare_def Let_def dest: parse_scoped split: if_splits bind_splits prod.splits)
 
 lemma prepare_bounded:
   "prepare s = Some e \<Longrightarrow> bounded 512 (compile (optimise e) []) 0"
-  by (auto simp: prepare_def Let_def closed_demand optimise_scoped split: if_splits bind_splits prod.splits)
+  by (auto simp: prepare_def Let_def closed_demand optimise_scoped dest: parse_scoped split: if_splits bind_splits prod.splits)
 
 lemma prepare_encodable:
   "prepare s = Some e \<Longrightarrow> list_all encodable (native (compile (optimise e) []))"
