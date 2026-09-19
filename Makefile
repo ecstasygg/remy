@@ -13,6 +13,7 @@ all: .build/ready
 
 check: all
 	python3 tests/native.py
+	python3 tests/cli.py
 
 payload: all
 	@mkdir -p .build/payload

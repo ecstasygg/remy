@@ -90,6 +90,15 @@ lemma trailing_rejected: "prepare ''(+ x y) 1'' = None"
 lemma literal_overflow_rejected: "prepare ''18446744073709551616'' = None"
   by eval
 
+lemma hexadecimal_boundaries:
+  "number ''0xffffffffffffffff'' = Some (2 ^ 64 - 1) \<and>
+    number ''0x10000000000000000'' = None"
+  by eval
+
+lemma hexadecimal_execution:
+  "reference ''(+ x 0XfF)'' ''0x1'' ''0'' ''0'' = (True,''256'' @ newline)"
+  by eval
+
 lemma incomplete_rejected: "prepare ''(if x y)'' = None"
   by eval
 

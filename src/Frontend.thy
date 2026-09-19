@@ -13,10 +13,24 @@ fun lex :: "string \<Rightarrow> string \<Rightarrow> string list \<Rightarrow> 
     else if c = CHR ''('' \<or> c = CHR '')'' then lex cs [] ([c] # finish word out)
     else lex cs (c # word) out)"
 
-definition number :: "string \<Rightarrow> nat option" where
-  "number s = (if s = [] \<or> \<not> list_all (\<lambda>c. 48 \<le> nat_of_char c \<and> nat_of_char c < 58) s
-    then None else let n = foldl (\<lambda>n c. min (2 ^ 64) (10 * n + nat_of_char c - 48)) 0 s in
+fun digit :: "char \<Rightarrow> nat" where
+  "digit c = (let n = nat_of_char c in
+    if 48 \<le> n \<and> n < 58 then n - 48 else
+    if 65 \<le> n \<and> n < 71 then n - 55 else
+    if 97 \<le> n \<and> n < 103 then n - 87 else 16)"
+
+definition parse_digits :: "nat \<Rightarrow> string \<Rightarrow> nat option" where
+  "parse_digits base s = (if s = [] \<or> \<not> list_all (\<lambda>c. digit c < base) s
+    then None else let n = foldl (\<lambda>n c. min (2 ^ 64) (base * n + digit c)) 0 s in
     if n < 2 ^ 64 then Some n else None)"
+
+definition number :: "string \<Rightarrow> nat option" where
+  "number s = (case s of a # b # rest \<Rightarrow>
+    if a = CHR ''0'' \<and> (b = CHR ''x'' \<or> b = CHR ''X'') then parse_digits 16 rest
+    else parse_digits 10 s | _ \<Rightarrow> parse_digits 10 s)"
+
+theorem number_bound: "number s = Some n \<Longrightarrow> n < 2 ^ 64"
+  by (auto simp: number_def parse_digits_def Let_def split: list.splits if_splits)
 
 definition valid_name :: "string \<Rightarrow> bool" where
   "valid_name s = (s \<noteq> [] \<and> list_all (\<lambda>c. (97 \<le> nat_of_char c \<and> nat_of_char c \<le> 122)) s
