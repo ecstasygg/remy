@@ -69,6 +69,7 @@ def main():
     cases += [("*", "x", 1), ("*", 1, "x"), ("and", "x", MASK)]
     cases += [("*", "x", 0), ("and", "x", 0), ("shl", 0, "y"), ("shr", 0, "y"), ("or", "x", MASK)]
     cases += [("if", "x", ("+", "y", "t"), ("+", "y", "t"))]
+    cases += [("let", "x1", ("+", "x", 1), ("*", "x1", "x1"))]
     cases += [("let", "a", ("+", "x", 3), ("+", "y", ("let", "b", "t", ("*", "a", "b")))),
               ("let", "x", "y", ("if", "t", ("+", "x", 1), ("-", "x", 1)))]
     cases += [generate(rng, 5, ["x", "y", "t"]) for _ in range(117)]

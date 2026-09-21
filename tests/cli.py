@@ -22,6 +22,10 @@ def main():
             assert int(invoke('eval',source,'0','0','0')) == expected, text
         source.write_text('(+ x y)')
         assert int(invoke('eval',source,'0xFF','0x1','0x0')) == 256
+        source.write_text('(let x1 7 (let x1 (+ x1 2) (* x1 x1)))')
+        assert int(invoke('eval',source,'0','0','0')) == 81
+        source.write_text('(let 1x 3 1x)')
+        invoke(source,binary,ok=False)
         for text in ['0x','0x10000000000000000','0xfg','0xffextra','-0x1']:
             source.write_text(text)
             binary.write_bytes(b'preserve')

@@ -77,6 +77,13 @@ lemma lexical_shadow:
   "reference ''(let x 7 (let x (+ x 2) (* x x)))'' ''1'' ''2'' ''3'' = (True,''81'' @ newline)"
   by eval
 
+lemma numeric_identifier:
+  "reference ''(let x1 7 (let x1 (+ x1 2) (* x1 x1)))'' ''0'' ''0'' ''0'' = (True,''81'' @ newline)"
+  by eval
+
+lemma numeric_prefix_rejected: "prepare ''(let 1x 3 1x)'' = None"
+  by eval
+
 lemma nested_temporaries:
   "reference ''(+ 10 (let a 3 (+ a (let b 4 (* a b)))))'' ''0'' ''0'' ''0'' = (True,''25'' @ newline)"
   by eval

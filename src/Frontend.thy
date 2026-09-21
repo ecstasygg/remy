@@ -33,8 +33,10 @@ theorem number_bound: "number s = Some n \<Longrightarrow> n < 2 ^ 64"
   by (auto simp: number_def parse_digits_def Let_def split: list.splits if_splits)
 
 definition valid_name :: "string \<Rightarrow> bool" where
-  "valid_name s = (s \<noteq> [] \<and> list_all (\<lambda>c. (97 \<le> nat_of_char c \<and> nat_of_char c \<le> 122)) s
-    \<and> s \<noteq> ''let'' \<and> s \<noteq> ''if'')"
+  "valid_name s = (case s of [] \<Rightarrow> False | c # cs \<Rightarrow>
+    97 \<le> nat_of_char c \<and> nat_of_char c \<le> 122 \<and>
+    list_all (\<lambda>d. (97 \<le> nat_of_char d \<and> nat_of_char d \<le> 122) \<or>
+      (48 \<le> nat_of_char d \<and> nat_of_char d < 58)) cs \<and> s \<noteq> ''let'' \<and> s \<noteq> ''if'')"
 
 fun lookup :: "string \<Rightarrow> string list \<Rightarrow> nat option" where
   "lookup name [] = None"
