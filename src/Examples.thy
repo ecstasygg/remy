@@ -109,4 +109,8 @@ lemma hexadecimal_execution:
 lemma incomplete_rejected: "prepare ''(if x y)'' = None"
   by eval
 
+lemma comment_tokens:
+  "lex (''(+ x; ignore ) tokens'' @ newline @ ''y) ; end'') [] [] = [''('', ''+'', ''x'', ''y'', '')'']"
+  by eval
+
 end

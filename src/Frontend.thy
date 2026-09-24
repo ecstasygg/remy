@@ -6,12 +6,18 @@ fun finish :: "string \<Rightarrow> string list \<Rightarrow> string list" where
   "finish [] out = out"
 | "finish word out = rev word # out"
 
-fun lex :: "string \<Rightarrow> string \<Rightarrow> string list \<Rightarrow> string list" where
-  "lex [] word out = rev (finish word out)"
-| "lex (c # cs) word out = (if c = CHR '' '' \<or> c = CHR 0x09 \<or> c = CHR 0x0A \<or> c = CHR 0x0D
-    then lex cs [] (finish word out)
-    else if c = CHR ''('' \<or> c = CHR '')'' then lex cs [] ([c] # finish word out)
-    else lex cs (c # word) out)"
+fun scan :: "string \<Rightarrow> string \<Rightarrow> string list \<Rightarrow> bool \<Rightarrow> string list" where
+  "scan [] word out comment = rev (finish word out)"
+| "scan (c # cs) word out comment = (if comment then
+      scan cs [] out (c \<noteq> CHR 0x0A \<and> c \<noteq> CHR 0x0D)
+    else if c = CHR '';'' then scan cs [] (finish word out) True
+    else if c = CHR '' '' \<or> c = CHR 0x09 \<or> c = CHR 0x0A \<or> c = CHR 0x0D
+    then scan cs [] (finish word out) False
+    else if c = CHR ''('' \<or> c = CHR '')'' then scan cs [] ([c] # finish word out) False
+    else scan cs (c # word) out False)"
+
+definition lex :: "string \<Rightarrow> string \<Rightarrow> string list \<Rightarrow> string list" where
+  "lex s word out = scan s word out False"
 
 fun digit :: "char \<Rightarrow> nat" where
   "digit c = (let n = nat_of_char c in

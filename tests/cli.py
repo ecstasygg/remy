@@ -26,6 +26,9 @@ def main():
         assert int(invoke('eval',source,'0','0','0')) == 81
         source.write_text('(let 1x 3 1x)')
         invoke(source,binary,ok=False)
+        for text in ['(+ x; ignore ) tokens\ny) ; end', '(+ x; comment\r\ny)', '(+ x y);end']:
+            source.write_text(text)
+            assert int(invoke('eval',source,'3','4','0')) == 7, text
         for text in ['0x','0x10000000000000000','0xfg','0xffextra','-0x1']:
             source.write_text(text)
             binary.write_bytes(b'preserve')
