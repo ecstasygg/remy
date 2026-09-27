@@ -29,6 +29,9 @@ def main():
         for text in ['(+ x; ignore ) tokens\ny) ; end', '(+ x; comment\r\ny)', '(+ x y);end']:
             source.write_text(text)
             assert int(invoke('eval',source,'3','4','0')) == 7, text
+        for text, position in [('(+ x)',3),('(div x y)',1),('(let a 3 b)',4),('(+ x y',4),('(+ x y) 1',5)]:
+            source.write_text(text)
+            assert f'token {position}\n' in invoke(source,binary,ok=False), text
         for text in ['0x','0x10000000000000000','0xfg','0xffextra','-0x1']:
             source.write_text(text)
             binary.write_bytes(b'preserve')

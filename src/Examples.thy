@@ -113,4 +113,12 @@ lemma comment_tokens:
   "lex (''(+ x; ignore ) tokens'' @ newline @ ''y) ; end'') [] [] = [''('', ''+'', ''x'', ''y'', '')'']"
   by eval
 
+lemma missing_operand_offset:
+  "source_error ''(+ x)'' = ''syntax error at token 3'' @ newline"
+  by eval
+
+lemma trailing_token_offset:
+  "source_error ''(+ x y) 1'' = ''syntax error at token 5'' @ newline"
+  by eval
+
 end

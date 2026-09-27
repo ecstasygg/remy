@@ -153,8 +153,57 @@ termination by (relation "measure id") (auto simp: div_less_dividend)
 
 definition newline :: string where "newline = [CHR 0x0A]"
 
+datatype problem = Unexpected nat | Exhausted nat
+
+datatype 'a outcome = Failed problem | Parsed 'a
+
+fun parsed_bind :: "'a outcome \<Rightarrow> ('a \<Rightarrow> 'b outcome) \<Rightarrow> 'b outcome" where
+  "parsed_bind (Failed p) f = Failed p"
+| "parsed_bind (Parsed x) f = f x"
+
+fun close_at :: "expression \<Rightarrow> string list \<Rightarrow> nat \<Rightarrow> (expression \<times> string list \<times> nat) outcome" where
+  "close_at e [] pos = Failed (Unexpected pos)"
+| "close_at e (s # rest) pos = (if s = '')'' then Parsed (e,rest,Suc pos) else Failed (Unexpected pos))"
+
+lemma close_at_cursor:
+  "close_at e tokens pos = Parsed (a,rest,nextpos) \<Longrightarrow> a = e \<and> nextpos = Suc pos"
+  by (cases tokens) (auto split: if_splits)
+
+function diagnose :: "nat \<Rightarrow> string list \<Rightarrow> string list \<Rightarrow> nat \<Rightarrow>
+    (expression \<times> string list \<times> nat) outcome" where
+  "diagnose fuel names tokens pos = (if fuel = 0 then Failed (Exhausted pos)
+    else case tokens of [] \<Rightarrow> Failed (Unexpected pos) | s # rest \<Rightarrow>
+    if s \<noteq> ''('' then (case atom names s of None \<Rightarrow> Failed (Unexpected pos)
+      | Some e \<Rightarrow> Parsed (e,rest,Suc pos))
+    else case rest of [] \<Rightarrow> Failed (Unexpected (Suc pos)) | op # args \<Rightarrow>
+      if op = ''let'' then (case args of [] \<Rightarrow> Failed (Unexpected (pos + 2)) | name # body \<Rightarrow>
+        if \<not> valid_name name then Failed (Unexpected (pos + 2)) else
+        parsed_bind (diagnose (fuel - 1) names body (pos + 3)) (\<lambda>(a,tail,nextpos).
+        parsed_bind (diagnose (fuel - 1) (name # names) tail nextpos) (\<lambda>(b,tail,lastpos).
+          close_at (Let a b) tail lastpos)))
+      else if op = ''if'' then
+        parsed_bind (diagnose (fuel - 1) names args (pos + 2)) (\<lambda>(c,tail,nextpos).
+        parsed_bind (diagnose (fuel - 1) names tail nextpos) (\<lambda>(a,tail,nextpos).
+        parsed_bind (diagnose (fuel - 1) names tail nextpos) (\<lambda>(b,tail,lastpos).
+          close_at (Cond c a b) tail lastpos)))
+      else case operator op of None \<Rightarrow> Failed (Unexpected (Suc pos)) | Some f \<Rightarrow>
+        parsed_bind (diagnose (fuel - 1) names args (pos + 2)) (\<lambda>(a,tail,nextpos).
+        parsed_bind (diagnose (fuel - 1) names tail nextpos) (\<lambda>(b,tail,lastpos).
+          close_at (Binary f a b) tail lastpos)))"
+  by pat_completeness auto
+termination by (relation "measure (\<lambda>(fuel,names,tokens,pos). fuel)") auto
+
+declare diagnose.simps [simp del]
+
+definition source_error :: "string \<Rightarrow> string" where
+  "source_error s = (case diagnose 128 [] (lex s [] []) 0 of
+    Failed (Unexpected pos) \<Rightarrow> ''syntax error at token '' @ decimal pos @ newline
+    | Failed (Exhausted pos) \<Rightarrow> ''invalid source or resource limit'' @ newline
+    | Parsed (e,rest,pos) \<Rightarrow> if rest \<noteq> [] then ''syntax error at token '' @ decimal pos @ newline
+      else ''invalid source or resource limit'' @ newline)"
+
 definition artifact :: "string \<Rightarrow> (bool \<times> string) \<times> string" where
-  "artifact s = (case prepare s of None \<Rightarrow> ((False,[]), ''invalid source or resource limit'' @ newline)
+  "artifact s = (case prepare s of None \<Rightarrow> ((False,[]), source_error s)
     | Some e \<Rightarrow> let opt = optimise e; bytes = executable e in
       ((True, map char_of_nat bytes), decimal (nodes e) @ '' nodes -> '' @ decimal (nodes opt) @
         '' nodes, '' @ decimal (length bytes) @ '' bytes, '' @ decimal (demand opt) @ '' stack words'' @ newline))"
@@ -171,13 +220,13 @@ definition row :: "expression \<Rightarrow> nat \<Rightarrow> nat list" where
     [sample i X, sample i Y, sample i T, evaluate e [] (sample i)])"
 
 definition vectors :: "string \<Rightarrow> bool \<times> string" where
-  "vectors s = (case prepare s of None \<Rightarrow> (False, ''invalid source or resource limit'' @ newline)
+  "vectors s = (case prepare s of None \<Rightarrow> (False, source_error s)
     | Some e \<Rightarrow> (True, map char_of_nat (concat (map (row e) [0..<512]))))"
 
 definition reference :: "string \<Rightarrow> string \<Rightarrow> string \<Rightarrow> string \<Rightarrow> bool \<times> string" where
-  "reference source x y t = (case (prepare source, number x, number y, number t) of
-    (Some e,Some a,Some b,Some c) \<Rightarrow>
+  "reference source x y t = (case prepare source of None \<Rightarrow> (False,source_error source) | Some e \<Rightarrow>
+    case (number x, number y, number t) of (Some a,Some b,Some c) \<Rightarrow>
       (True, decimal (unat (evaluate e [] (\<lambda>v. word_of_nat (case v of X \<Rightarrow> a | Y \<Rightarrow> b | T \<Rightarrow> c)))) @ newline)
-    | _ \<Rightarrow> (False,''invalid source or input'' @ newline))"
+    | _ \<Rightarrow> (False,''invalid input'' @ newline))"
 
 end
