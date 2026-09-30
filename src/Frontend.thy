@@ -196,11 +196,14 @@ termination by (relation "measure (\<lambda>(fuel,names,tokens,pos). fuel)") aut
 declare diagnose.simps [simp del]
 
 definition source_error :: "string \<Rightarrow> string" where
-  "source_error s = (case diagnose 128 [] (lex s [] []) 0 of
+  "source_error s = (if \<not> list_all (\<lambda>c. nat_of_char c < 128) s then ''source must contain ASCII'' @ newline else
+    case diagnose 128 [] (lex s [] []) 0 of
     Failed (Unexpected pos) \<Rightarrow> ''syntax error at token '' @ decimal pos @ newline
-    | Failed (Exhausted pos) \<Rightarrow> ''invalid source or resource limit'' @ newline
+    | Failed (Exhausted pos) \<Rightarrow> ''parse depth limit exceeded at token '' @ decimal pos @ newline
     | Parsed (e,rest,pos) \<Rightarrow> if rest \<noteq> [] then ''syntax error at token '' @ decimal pos @ newline
-      else ''invalid source or resource limit'' @ newline)"
+      else if nodes e > 4096 then ''program exceeds 4096 nodes'' @ newline
+      else if demand (optimise e) > 512 then ''evaluation stack exceeds 512 words'' @ newline
+      else ''native validation failed'' @ newline)"
 
 definition artifact :: "string \<Rightarrow> (bool \<times> string) \<times> string" where
   "artifact s = (case prepare s of None \<Rightarrow> ((False,[]), source_error s)

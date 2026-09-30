@@ -32,6 +32,15 @@ def main():
         for text, position in [('(+ x)',3),('(div x y)',1),('(let a 3 b)',4),('(+ x y',4),('(+ x y) 1',5)]:
             source.write_text(text)
             assert f'token {position}\n' in invoke(source,binary,ok=False), text
+        source.write_text('(+ 1 ' * 129 + '0' + ')' * 129)
+        assert 'parse depth limit' in invoke(source,binary,ok=False)
+        large = '0'
+        for _ in range(12):
+            large = f'(+ {large} {large})'
+        source.write_text(large)
+        assert '4096 nodes' in invoke(source,binary,ok=False)
+        source.write_text('é')
+        assert 'ASCII' in invoke(source,binary,ok=False)
         for text in ['0x','0x10000000000000000','0xfg','0xffextra','-0x1']:
             source.write_text(text)
             binary.write_bytes(b'preserve')

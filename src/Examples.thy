@@ -121,4 +121,8 @@ lemma trailing_token_offset:
   "source_error ''(+ x y) 1'' = ''syntax error at token 5'' @ newline"
   by eval
 
+lemma exhausted_parser:
+  "diagnose 0 [] [''1''] 7 = Failed (Exhausted 7)"
+  by (subst diagnose.simps) simp
+
 end
