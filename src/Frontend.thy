@@ -104,24 +104,45 @@ next
         drule close_expression; auto dest: Suc.IH)
 qed
 
-definition prepare :: "string \<Rightarrow> expression option" where
-  "prepare s = (if \<not> list_all (\<lambda>c. nat_of_char c < 128) s then None else
-    Option.bind (parse 128 [] (lex s [] [])) (\<lambda>(e,rest).
-      if rest = [] \<and> nodes e \<le> 4096 then
+record limits =
+  depth_budget :: nat
+  node_budget :: nat
+  stack_budget :: nat
+
+definition defaults :: limits where
+  "defaults = \<lparr>depth_budget = 128, node_budget = 4096, stack_budget = 512\<rparr>"
+
+definition valid_limits :: "limits \<Rightarrow> bool" where
+  "valid_limits lim = (depth_budget lim \<le> 128 \<and> node_budget lim \<le> 4096 \<and> stack_budget lim \<le> 512)"
+
+definition prepare_with :: "limits \<Rightarrow> string \<Rightarrow> expression option" where
+  "prepare_with lim s = (if \<not> valid_limits lim \<or> \<not> list_all (\<lambda>c. nat_of_char c < 128) s then None else
+    Option.bind (parse (depth_budget lim) [] (lex s [] [])) (\<lambda>(e,rest).
+      if rest = [] \<and> nodes e \<le> node_budget lim then
         let code = compile (optimise e) [] in
-        if check code 0 = Some 1 \<and> demand (optimise e) \<le> 512 \<and> list_all encodable (native code)
+        if check code 0 = Some 1 \<and> demand (optimise e) \<le> stack_budget lim \<and> list_all encodable (native code)
         then Some e else None else None))"
 
+definition prepare :: "string \<Rightarrow> expression option" where
+  "prepare = prepare_with defaults"
+
+lemma prepare_with_scoped: "prepare_with lim s = Some e \<Longrightarrow> scoped 0 e"
+  by (auto simp: prepare_with_def Let_def dest: parse_scoped split: if_splits bind_splits prod.splits)
+
+lemma prepare_with_bounded:
+  "prepare_with lim s = Some e \<Longrightarrow> bounded (stack_budget lim) (compile (optimise e) []) 0"
+  by (auto simp: prepare_with_def Let_def closed_demand optimise_scoped dest: parse_scoped split: if_splits bind_splits prod.splits)
+
 lemma prepare_scoped: "prepare s = Some e \<Longrightarrow> scoped 0 e"
-  by (auto simp: prepare_def Let_def dest: parse_scoped split: if_splits bind_splits prod.splits)
+  unfolding prepare_def using prepare_with_scoped by blast
 
 lemma prepare_bounded:
   "prepare s = Some e \<Longrightarrow> bounded 512 (compile (optimise e) []) 0"
-  by (auto simp: prepare_def Let_def closed_demand optimise_scoped dest: parse_scoped split: if_splits bind_splits prod.splits)
+  using prepare_with_bounded[where lim=defaults] by (simp add: prepare_def defaults_def)
 
 lemma prepare_encodable:
   "prepare s = Some e \<Longrightarrow> list_all encodable (native (compile (optimise e) []))"
-  by (auto simp: prepare_def Let_def split: if_splits bind_splits prod.splits)
+  by (auto simp: prepare_def prepare_with_def Let_def split: if_splits bind_splits prod.splits)
 
 theorem prepared_correct:
   "prepare source = Some e \<Longrightarrow>
@@ -195,21 +216,32 @@ termination by (relation "measure (\<lambda>(fuel,names,tokens,pos). fuel)") aut
 
 declare diagnose.simps [simp del]
 
-definition source_error :: "string \<Rightarrow> string" where
-  "source_error s = (if \<not> list_all (\<lambda>c. nat_of_char c < 128) s then ''source must contain ASCII'' @ newline else
-    case diagnose 128 [] (lex s [] []) 0 of
+definition source_error_with :: "limits \<Rightarrow> string \<Rightarrow> string" where
+  "source_error_with lim s = (if \<not> valid_limits lim then ''limits exceed compiler bounds'' @ newline else if \<not> list_all (\<lambda>c. nat_of_char c < 128) s then ''source must contain ASCII'' @ newline else
+    case diagnose (depth_budget lim) [] (lex s [] []) 0 of
     Failed (Unexpected pos) \<Rightarrow> ''syntax error at token '' @ decimal pos @ newline
     | Failed (Exhausted pos) \<Rightarrow> ''parse depth limit exceeded at token '' @ decimal pos @ newline
     | Parsed (e,rest,pos) \<Rightarrow> if rest \<noteq> [] then ''syntax error at token '' @ decimal pos @ newline
-      else if nodes e > 4096 then ''program exceeds 4096 nodes'' @ newline
-      else if demand (optimise e) > 512 then ''evaluation stack exceeds 512 words'' @ newline
+      else if nodes e > node_budget lim then ''program exceeds '' @ decimal (node_budget lim) @ '' nodes'' @ newline
+      else if demand (optimise e) > stack_budget lim then ''evaluation stack exceeds '' @ decimal (stack_budget lim) @ '' words'' @ newline
       else ''native validation failed'' @ newline)"
 
-definition artifact :: "string \<Rightarrow> (bool \<times> string) \<times> string" where
-  "artifact s = (case prepare s of None \<Rightarrow> ((False,[]), source_error s)
+definition artifact_with :: "limits \<Rightarrow> string \<Rightarrow> (bool \<times> string) \<times> string" where
+  "artifact_with lim s = (case prepare_with lim s of None \<Rightarrow> ((False,[]), source_error_with lim s)
     | Some e \<Rightarrow> let opt = optimise e; bytes = executable e in
       ((True, map char_of_nat bytes), decimal (nodes e) @ '' nodes -> '' @ decimal (nodes opt) @
         '' nodes, '' @ decimal (length bytes) @ '' bytes, '' @ decimal (demand opt) @ '' stack words'' @ newline))"
+
+definition source_error :: "string \<Rightarrow> string" where
+  "source_error = source_error_with defaults"
+
+definition artifact :: "string \<Rightarrow> (bool \<times> string) \<times> string" where
+  "artifact = artifact_with defaults"
+
+definition configured :: "string \<Rightarrow> string \<Rightarrow> string \<Rightarrow> string \<Rightarrow> (bool \<times> string) \<times> string" where
+  "configured depth count stacktext source = (case (number depth, number count, number stacktext) of
+    (Some d,Some n,Some k) \<Rightarrow> artifact_with \<lparr>depth_budget=d, node_budget=n, stack_budget=k\<rparr> source
+    | _ \<Rightarrow> ((False,[]),''invalid resource limits'' @ newline))"
 
 definition boundary :: "nat list" where
   "boundary = [0,1,63,64,65,127,255,256,2 ^ 31,2 ^ 32,2 ^ 63,2 ^ 64 - 1]"

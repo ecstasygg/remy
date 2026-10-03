@@ -39,6 +39,13 @@ def main():
             large = f'(+ {large} {large})'
         source.write_text(large)
         assert '4096 nodes' in invoke(source,binary,ok=False)
+        source.write_text('(+ x y)')
+        invoke('limits',4,3,2,source,binary)
+        for depth, nodes, stack, message in [(4,2,2,'2 nodes'),(4,3,1,'1 words'),
+            (0,3,2,'parse depth'),(129,3,2,'compiler bounds'),('bad',3,2,'invalid resource')]:
+            binary.write_bytes(b'preserve')
+            assert message in invoke('limits',depth,nodes,stack,source,binary,ok=False)
+            assert binary.read_bytes() == b'preserve'
         source.write_text('é')
         assert 'ASCII' in invoke(source,binary,ok=False)
         for text in ['0x','0x10000000000000000','0xfg','0xffextra','-0x1']:

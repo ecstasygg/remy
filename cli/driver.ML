@@ -26,15 +26,18 @@ fun output (ok, message) =
   (TextIO.output (if ok then TextIO.stdOut else TextIO.stdErr, text message);
    if ok then () else OS.Process.exit OS.Process.failure);
 
+fun emit destination ((ok, bytes), report) =
+  if ok then (write destination bytes; output (true,report)) else output (false,report);
+
 fun main () =
   (case CommandLine.arguments () of
     ["vectors", source, destination] =>
       (case Remy.vectors (read source) of (true, bytes) => write destination bytes | result => output result)
   | ["eval", source, x, y, t] => output (Remy.reference (read source) (chars x) (chars y) (chars t))
-  | [source, destination] =>
-      let val ((ok, bytes), report) = Remy.artifact (read source)
-      in if ok then (write destination bytes; output (true,report)) else output (false,report) end
-  | _ => raise Fail "usage: remy source binary | remy vectors source data | remy eval source x y t")
+  | ["limits", depth, nodes, stack, source, destination] =>
+      emit destination (Remy.configured (chars depth) (chars nodes) (chars stack) (read source))
+  | [source, destination] => emit destination (Remy.artifact (read source))
+  | _ => raise Fail "usage: remy limits depth nodes stack source binary | remy source binary | remy vectors source data | remy eval source x y t")
   handle exn =>
     (TextIO.output (TextIO.stdErr, "remy: " ^ General.exnMessage exn ^ "\n");
      OS.Process.exit OS.Process.failure);
