@@ -52,6 +52,14 @@ fun arithmetic :: "operator \<Rightarrow> nat list" where
 | "arithmetic Shr = [72,145,72,211,232]"
 | "arithmetic Less = [72,145,72,57,200,15,146,192,72,15,182,192]"
 
+fun regno :: "register \<Rightarrow> nat" where
+  "regno Rax = 0" | "regno Rcx = 1" | "regno Rdx = 2"
+| "regno Rbx = 3" | "regno R8 = 8" | "regno R9 = 9"
+
+definition movecode :: "register \<Rightarrow> register \<Rightarrow> nat list" where
+  "movecode dst src = [72 + (if regno src \<ge> 8 then 4 else 0) + (if regno dst \<ge> 8 then 1 else 0),
+    137, 192 + 8 * (regno src mod 8) + regno dst mod 8]"
+
 fun encode :: "opcode \<Rightarrow> nat list" where
   "encode (Immediate v) = [72,184] @ octets 8 (unat v)"
 | "encode (Push r) = pushcode r"
@@ -59,6 +67,7 @@ fun encode :: "opcode \<Rightarrow> nat list" where
 | "encode (Peek i) = [72,139,132,36] @ octets 4 (8 * i)"
 | "encode (Arithmetic op) = arithmetic op"
 | "encode Conditional = [72,133,219,72,15,69,193]"
+| "encode (Move dst src) = movecode dst src"
 
 fun encodable :: "opcode \<Rightarrow> bool" where
   "encodable (Peek i) = (i < 2 ^ 28)"
@@ -66,7 +75,8 @@ fun encodable :: "opcode \<Rightarrow> bool" where
 
 definition fixed :: "opcode list" where
   "fixed = map Push [Rax,Rcx,Rbx,Rdx,R8,R9] @ map Pop [Rax,Rcx,Rbx,Rdx,R8,R9] @
-    map Arithmetic [Add,Sub,Mul,And,Or,Xor,Shl,Shr,Less] @ [Conditional]"
+    map Arithmetic [Add,Sub,Mul,And,Or,Xor,Shl,Shr,Less] @ [Conditional] @
+    concat (map (\<lambda>dst. map (Move dst) [Rax,Rcx,Rbx,Rdx,R8,R9]) [Rax,Rcx,Rbx,Rdx,R8,R9])"
 
 definition decode :: "nat list \<Rightarrow> (opcode \<times> nat list) option" where
   "decode bs = (if take 2 bs = [72,184] then
@@ -111,6 +121,10 @@ next
 next
   case Conditional
   then show ?thesis by (simp add: decode_def fixed_def)
+next
+  case (Move dst src)
+  then show ?thesis by (cases dst; cases src) (simp_all add: decode_def fixed_def movecode_def)
+
 qed
 
 theorem encode_bytes: "set (encode op) \<subseteq> {..<256}"
@@ -132,6 +146,10 @@ next
 next
   case Conditional
   then show ?thesis by simp
+next
+  case (Move dst src)
+  then show ?thesis by (cases dst; cases src) (simp_all add: movecode_def)
+
 qed
 
 theorem encode_injective:
@@ -150,7 +168,7 @@ theorem recover_encode:
   by (induction ops) (simp_all add: decode_encode)
 
 definition executable :: "expression \<Rightarrow> nat list" where
-  "executable e = concat (map encode (native (compile (optimise e) []))) @ [88,195]"
+  "executable e = concat (map encode (program e)) @ [195]"
 
 theorem executable_bytes: "set (executable e) \<subseteq> {..<256}"
   unfolding executable_def using encode_bytes by auto

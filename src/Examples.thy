@@ -57,7 +57,7 @@ lemma stack_bound_tight:
   by eval
 
 lemma literal_code:
-  "executable (Literal 42) = [72,184,42,0,0,0,0,0,0,0,80,88,195]"
+  "executable (Literal 42) = [72,184,42,0,0,0,0,0,0,0,195]"
   by eval
 
 lemma opcode_roundtrip:

@@ -5,7 +5,7 @@ begin
 datatype register = Rax | Rcx | Rbx | Rdx | R8 | R9
 
 datatype opcode = Immediate pixel | Push register | Pop register | Peek nat
-  | Arithmetic operator | Conditional
+  | Arithmetic operator | Conditional | Move register register
 
 record machine =
   registers :: "register \<Rightarrow> pixel"
@@ -38,6 +38,7 @@ fun transition :: "opcode \<Rightarrow> machine \<Rightarrow> machine option" wh
       Rax := operate op (registers s Rcx) (registers s Rax))\<rparr>)"
 | "transition Conditional s = Some (s\<lparr>registers :=
     (registers s)(Rax := if registers s Rbx = 0 then registers s Rax else registers s Rcx)\<rparr>)"
+| "transition (Move dst src) s = Some (s\<lparr>registers := (registers s)(dst := registers s src)\<rparr>)"
 
 fun run :: "opcode list \<Rightarrow> machine \<Rightarrow> machine option" where
   "run [] s = Some s"
@@ -142,6 +143,7 @@ qed
 fun writes :: "opcode \<Rightarrow> register set" where
   "writes (Immediate v) = {Rax}"
 | "writes (Pop r) = {r}"
+| "writes (Move dst src) = {dst}"
 | "writes (Peek i) = {Rax}"
 | "writes (Arithmetic op) = {Rax,Rcx}"
 | "writes Conditional = {Rax}"
@@ -159,5 +161,31 @@ theorem run_preserves:
 lemma lower_scratch:
   "list_all (\<lambda>i. writes i \<subseteq> {Rax,Rcx,Rbx}) (lower op)"
   by (cases op) auto
+
+fun transfers :: "opcode list \<Rightarrow> opcode list" where
+  "transfers (Push src # Pop dst # code) =
+    (if src = dst then transfers code else Move dst src # transfers code)"
+| "transfers (op # code) = op # transfers code"
+| "transfers [] = []"
+
+theorem transfers_correct: "run (transfers code) s = run code s"
+  by (induction code arbitrary: s rule: transfers.induct)
+    (auto simp: fun_upd_idem split: if_splits option.splits bind_splits)
+
+lemma transfers_length: "length (transfers code) \<le> length code"
+  by (induction code rule: transfers.induct) auto
+
+lemma transfers_property:
+  "list_all P code \<Longrightarrow> (\<And>a b. P (Push a) \<Longrightarrow> P (Pop b) \<Longrightarrow> P (Move b a)) \<Longrightarrow>
+    list_all P (transfers code)"
+  by (induction code rule: transfers.induct) auto
+
+definition program :: "expression \<Rightarrow> opcode list" where
+  "program e = transfers (native (compile (optimise e) []) @ [Pop Rax])"
+
+theorem program_return:
+  "scoped 0 e \<Longrightarrow> \<exists>q. run (program e) s = Some q \<and>
+    registers q Rax = evaluate e [] (inputs s) \<and> stack q = stack s \<and> inputs q = inputs s"
+  unfolding program_def using native_return transfers_correct by metis
 
 end

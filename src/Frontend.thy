@@ -144,6 +144,11 @@ lemma prepare_encodable:
   "prepare s = Some e \<Longrightarrow> list_all encodable (native (compile (optimise e) []))"
   by (auto simp: prepare_def prepare_with_def Let_def split: if_splits bind_splits prod.splits)
 
+lemma prepare_program:
+  "prepare s = Some e \<Longrightarrow> list_all encodable (program e)"
+  unfolding program_def using prepare_encodable
+  by (auto intro: transfers_property)
+
 theorem prepared_correct:
   "prepare source = Some e \<Longrightarrow>
     execute values (compile (optimise e) []) [] = Some [evaluate e [] values]"
@@ -157,9 +162,9 @@ theorem prepared_native:
 
 theorem prepared_bytes:
   "prepare source = Some e \<Longrightarrow>
-    recover (length (native (compile (optimise e) []))) (executable e) =
-    Some (native (compile (optimise e) []), [88,195])"
-  unfolding executable_def using recover_encode prepare_encodable by blast
+    recover (length (program e)) (executable e) =
+    Some (program e, [195])"
+  unfolding executable_def using recover_encode prepare_program by blast
 
 theorem prepared_stacks:
   "prepare source = Some e \<Longrightarrow>
