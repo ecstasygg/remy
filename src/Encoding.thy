@@ -60,8 +60,19 @@ definition movecode :: "register \<Rightarrow> register \<Rightarrow> nat list" 
   "movecode dst src = [72 + (if regno src \<ge> 8 then 4 else 0) + (if regno dst \<ge> 8 then 1 else 0),
     137, 192 + 8 * (regno src mod 8) + regno dst mod 8]"
 
+definition extend32 :: "nat \<Rightarrow> pixel" where
+  "extend32 n = word_of_int (signed_take_bit 31 (int n))"
+
+lemma extend32_octets [simp]: "extend32 (integer (octets 4 n)) = extend32 n"
+proof -
+  have "signed_take_bit 31 (int (n mod 256 ^ 4)) = signed_take_bit 31 (int n)"
+    by (simp add: signed_take_bit_eq_iff_take_bit_eq take_bit_eq_mod of_nat_mod)
+  then show ?thesis by (simp add: extend32_def integer_octets)
+qed
+
 fun encode :: "opcode \<Rightarrow> nat list" where
-  "encode (Immediate v) = [72,184] @ octets 8 (unat v)"
+  "encode (Immediate v) = (if extend32 (unat v) = v then [72,199,192] @ octets 4 (unat v)
+    else [72,184] @ octets 8 (unat v))"
 | "encode (Push r) = pushcode r"
 | "encode (Pop r) = popcode r"
 | "encode (Peek i) = [72,139,132,36] @ octets 4 (8 * i)"
@@ -82,6 +93,9 @@ definition decode :: "nat list \<Rightarrow> (opcode \<times> nat list) option" 
   "decode bs = (if take 2 bs = [72,184] then
     if 10 \<le> length bs \<and> list_all (\<lambda>b. b < 256) (take 8 (drop 2 bs)) then
       Some (Immediate (word_of_nat (integer (take 8 (drop 2 bs)))), drop 10 bs) else None
+    else if take 3 bs = [72,199,192] then
+      if 7 \<le> length bs \<and> list_all (\<lambda>b. b < 256) (take 4 (drop 3 bs)) then
+        Some (Immediate (extend32 (integer (take 4 (drop 3 bs)))), drop 7 bs) else None
     else if take 4 bs = [72,139,132,36] then
       let n = integer (take 4 (drop 4 bs)) in
       if 8 \<le> length bs \<and> list_all (\<lambda>b. b < 256) (take 4 (drop 4 bs)) \<and>
@@ -102,7 +116,7 @@ theorem decode_encode:
 proof (cases op)
   case (Immediate v)
   then show ?thesis
-    by (simp add: decode_def take_add integer_literal)
+    by (auto simp: decode_def take_add integer_literal split: if_splits)
 next
   case (Push r)
   then show ?thesis by (cases r) (simp_all add: decode_def fixed_def)

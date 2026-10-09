@@ -57,7 +57,15 @@ lemma stack_bound_tight:
   by eval
 
 lemma literal_code:
-  "executable (Literal 42) = [72,184,42,0,0,0,0,0,0,0,195]"
+  "executable (Literal 42) = [72,199,192,42,0,0,0,195]"
+  by eval
+
+lemma signed_immediates:
+  "encode (Immediate (-1)) = [72,199,192,255,255,255,255] \<and>
+    length (encode (Immediate 2147483647)) = 7 \<and>
+    length (encode (Immediate 2147483648)) = 10 \<and>
+    length (encode (Immediate (-2147483648))) = 7 \<and>
+    length (encode (Immediate (-2147483649))) = 10"
   by eval
 
 lemma opcode_roundtrip:
