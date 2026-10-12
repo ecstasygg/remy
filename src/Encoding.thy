@@ -75,7 +75,8 @@ fun encode :: "opcode \<Rightarrow> nat list" where
     else [72,184] @ octets 8 (unat v))"
 | "encode (Push r) = pushcode r"
 | "encode (Pop r) = popcode r"
-| "encode (Peek i) = [72,139,132,36] @ octets 4 (8 * i)"
+| "encode (Peek i) = (if i < 16 then [72,139,68,36,8 * i]
+    else [72,139,132,36] @ octets 4 (8 * i))"
 | "encode (Arithmetic op) = arithmetic op"
 | "encode Conditional = [72,133,219,72,15,69,193]"
 | "encode (Move dst src) = movecode dst src"
@@ -96,6 +97,10 @@ definition decode :: "nat list \<Rightarrow> (opcode \<times> nat list) option" 
     else if take 3 bs = [72,199,192] then
       if 7 \<le> length bs \<and> list_all (\<lambda>b. b < 256) (take 4 (drop 3 bs)) then
         Some (Immediate (extend32 (integer (take 4 (drop 3 bs)))), drop 7 bs) else None
+    else if take 4 bs = [72,139,68,36] then
+      let n = integer (take 1 (drop 4 bs)) in
+      if 5 \<le> length bs \<and> n < 128 \<and> n mod 8 = 0
+      then Some (Peek (n div 8), drop 5 bs) else None
     else if take 4 bs = [72,139,132,36] then
       let n = integer (take 4 (drop 4 bs)) in
       if 8 \<le> length bs \<and> list_all (\<lambda>b. b < 256) (take 4 (drop 4 bs)) \<and>
@@ -128,7 +133,7 @@ next
   have small: "i < 2 ^ 28" using valid Peek by simp
   have bound: "8 * i < 4294967296" using peek_bound[OF small] by simp
   show ?thesis using Peek small bound
-    by (simp add: decode_def integer_octets Let_def)
+    by (auto simp: decode_def integer_octets Let_def split: if_splits)
 next
   case (Arithmetic op)
   then show ?thesis by (cases op) (simp_all add: decode_def fixed_def)

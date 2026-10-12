@@ -68,6 +68,13 @@ lemma signed_immediates:
     length (encode (Immediate (-2147483649))) = 10"
   by eval
 
+lemma compact_slots:
+  "encode (Peek 15) = [72,139,68,36,120] \<and>
+    length (encode (Peek 16)) = 8 \<and>
+    decode [72,139,68,36,128] = None \<and>
+    decode [72,139,68,36,7] = None"
+  by eval
+
 lemma opcode_roundtrip:
   "decode [72,145,72,211,232,195] = Some (Arithmetic Shr,[195])"
   by eval
