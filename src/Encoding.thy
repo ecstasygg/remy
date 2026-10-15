@@ -176,6 +176,53 @@ theorem encode_injective:
   using decode_encode[of a "[]"] decode_encode[of b "[]"]
   by (metis append_Nil option.inject prod.inject)
 
+lemma push_nonempty [simp]: "pushcode r \<noteq> []"
+  by (cases r) auto
+
+lemma pop_nonempty [simp]: "popcode r \<noteq> []"
+  by (cases r) auto
+
+lemma arithmetic_nonempty [simp]: "arithmetic op \<noteq> []"
+  by (cases op) auto
+
+lemma encode_nonempty [simp]: "encode op \<noteq> []"
+  by (cases op) (auto simp: movecode_def)
+
+lemma fixed_decode:
+  "List.find (\<lambda>op. take (length (encode op)) bs = encode op) fixed = Some op \<Longrightarrow>
+    0 < length (encode op) \<and> length (encode op) \<le> length bs \<and>
+    list_all (\<lambda>b. b < 256) (take (length (encode op)) bs)"
+  using encode_bytes[of op]
+  by (auto simp: find_Some_iff list_all_iff dest: arg_cong[where f=length])
+
+theorem decode_progress:
+  "decode bs = Some (op,rest) \<Longrightarrow> length rest < length bs"
+  unfolding decode_def
+  apply (auto simp: Let_def dest: fixed_decode split: if_splits option.splits)
+  apply (drule fixed_decode)
+  apply auto
+  by (cases bs) auto
+
+theorem decode_consumed:
+  "decode bs = Some (op,rest) \<Longrightarrow> list_all (\<lambda>b. b < 256) bs \<Longrightarrow>
+    \<exists>prefix. bs = prefix @ rest \<and> prefix \<noteq> [] \<and> list_all (\<lambda>b. b < 256) prefix"
+proof -
+  assume decoded: "decode bs = Some (op,rest)"
+    and input: "list_all (\<lambda>b. b < 256) bs"
+  have drop: "rest = drop (length bs - length rest) bs"
+    using decoded unfolding decode_def
+    apply (auto simp: Let_def split: if_splits option.splits)
+    apply (drule fixed_decode)
+    by auto
+  have bytes: "list_all (\<lambda>b. b < 256) (take (length bs - length rest) bs)"
+    using input by (auto simp: list_all_iff dest: in_set_takeD)
+  have decomposition: "bs = take (length bs - length rest) bs @ rest"
+    using drop append_take_drop_id[of "length bs - length rest" bs] by metis
+  show ?thesis
+    using decomposition bytes decode_progress[OF decoded]
+    by (intro exI[where x="take (length bs - length rest) bs"]) auto
+qed
+
 fun recover :: "nat \<Rightarrow> nat list \<Rightarrow> (opcode list \<times> nat list) option" where
   "recover 0 bs = Some ([],bs)"
 | "recover (Suc n) bs = Option.bind (decode bs) (\<lambda>(op,tail).
