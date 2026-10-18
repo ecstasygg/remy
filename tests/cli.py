@@ -46,6 +46,15 @@ def main():
             binary.write_bytes(b'preserve')
             assert message in invoke('limits',depth,nodes,stack,source,binary,ok=False)
             assert binary.read_bytes() == b'preserve'
+        source.write_text('(+ x y)')
+        invoke(source,binary)
+        listing = invoke('disassemble',binary)
+        assert 'mov rax r9' in listing and 'arithmetic add' in listing and 'ret' in listing
+        for malformed in [b'',bytes([195,0]),bytes([72,199,192,0]),bytes([80])]:
+            binary.write_bytes(malformed)
+            assert 'invalid native' in invoke('disassemble',binary,ok=False)
+        binary.write_bytes(bytes([72,184,42,0,0,0,0,0,0,0,195]))
+        assert '10  ret' in invoke('disassemble',binary)
         source.write_text('é')
         assert 'ASCII' in invoke(source,binary,ok=False)
         for text in ['0x','0x10000000000000000','0xfg','0xffextra','-0x1']:

@@ -233,6 +233,16 @@ theorem recover_encode:
     recover (length ops) (concat (map encode ops) @ tail) = Some (ops,tail)"
   by (induction ops) (simp_all add: decode_encode)
 
+function blocks :: "nat list \<Rightarrow> (nat list \<times> opcode) list option" where
+  "blocks bs = (if bs = [195] then Some [] else
+    Option.bind (decode bs) (\<lambda>(op,rest).
+      map_option (\<lambda>code. (take (length bs - length rest) bs,op) # code) (blocks rest)))"
+  by pat_completeness auto
+termination
+  by (relation "measure length") (auto dest: decode_progress)
+
+declare blocks.simps [simp del]
+
 definition executable :: "expression \<Rightarrow> nat list" where
   "executable e = concat (map encode (program e)) @ [195]"
 

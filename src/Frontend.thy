@@ -179,6 +179,35 @@ termination by (relation "measure id") (auto simp: div_less_dividend)
 
 definition newline :: string where "newline = [CHR 0x0A]"
 
+fun regname :: "register \<Rightarrow> string" where
+  "regname Rax = ''rax''" | "regname Rcx = ''rcx''" | "regname Rbx = ''rbx''"
+| "regname Rdx = ''rdx''" | "regname R8 = ''r8''" | "regname R9 = ''r9''"
+
+fun opname :: "operator \<Rightarrow> string" where
+  "opname Add = ''add''" | "opname Sub = ''sub''" | "opname Mul = ''mul''"
+| "opname And = ''and''" | "opname Or = ''or''" | "opname Xor = ''xor''"
+| "opname Shl = ''shl''" | "opname Shr = ''shr''" | "opname Less = ''less''"
+
+fun mnemonic :: "opcode \<Rightarrow> string" where
+  "mnemonic (Immediate v) = ''immediate rax '' @ decimal (unat v)"
+| "mnemonic (Push r) = ''push '' @ regname r"
+| "mnemonic (Pop r) = ''pop '' @ regname r"
+| "mnemonic (Move dst src) = ''mov '' @ regname dst @ '' '' @ regname src"
+| "mnemonic (Peek i) = ''peek rax stack['' @ decimal i @ '']''"
+| "mnemonic (Arithmetic op) = ''arithmetic '' @ opname op"
+| "mnemonic Conditional = ''conditional rax rcx rbx''"
+
+fun listing :: "nat \<Rightarrow> (nat list \<times> opcode) list \<Rightarrow> string" where
+  "listing offset [] = decimal offset @ ''  ret'' @ newline"
+| "listing offset ((bytes,op) # code) = decimal offset @ ''  '' @ mnemonic op @
+    ''  ['' @ concat (map (\<lambda>b. decimal b @ '' '') bytes) @ '']'' @ newline @
+    listing (offset + length bytes) code"
+
+definition disassemble :: "string \<Rightarrow> bool \<times> string" where
+  "disassemble bytes = (case blocks (map nat_of_char bytes) of
+    None \<Rightarrow> (False,''invalid native block stream'' @ newline)
+    | Some code \<Rightarrow> (True,listing 0 code))"
+
 datatype problem = Unexpected nat | Exhausted nat
 
 datatype 'a outcome = Failed problem | Parsed 'a

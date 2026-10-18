@@ -36,8 +36,9 @@ fun main () =
   | ["eval", source, x, y, t] => output (Remy.reference (read source) (chars x) (chars y) (chars t))
   | ["limits", depth, nodes, stack, source, destination] =>
       emit destination (Remy.configured (chars depth) (chars nodes) (chars stack) (read source))
+  | ["disassemble", binary] => output (Remy.disassemble (read binary))
   | [source, destination] => emit destination (Remy.artifact (read source))
-  | _ => raise Fail "usage: remy limits depth nodes stack source binary | remy source binary | remy vectors source data | remy eval source x y t")
+  | _ => raise Fail "usage: remy disassemble binary | remy limits depth nodes stack source binary | remy source binary | remy vectors source data | remy eval source x y t")
   handle exn =>
     (TextIO.output (TextIO.stdErr, "remy: " ^ General.exnMessage exn ^ "\n");
      OS.Process.exit OS.Process.failure);
