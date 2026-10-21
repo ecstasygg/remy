@@ -80,6 +80,8 @@ def main():
             path.write_text(source(case))
             result = subprocess.run([ROOT / ".build/remy", path, binary], capture_output=True, text=True, timeout=30)
             assert result.returncode == 0, (case, result.stderr)
+            checked = subprocess.run([ROOT / ".build/remy", "check", binary],capture_output=True,text=True,timeout=30)
+            assert checked.returncode == 0, (case,checked.stderr)
             function, image, thunk = native(binary.read_bytes())
             vectors = [(a, b, a ^ b) for a in (0, 1, MASK, 1 << 63) for b in (0, 1, 63, 64, 65, MASK)]
             vectors += [tuple(rng.getrandbits(64) for _ in range(3)) for _ in range(24)]

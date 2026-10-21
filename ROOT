@@ -13,6 +13,7 @@ session Remy in src = Remybase +
     Compiler
     Native
     Encoding
+    Checker
     Frontend
     Examples
     Export

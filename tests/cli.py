@@ -55,6 +55,14 @@ def main():
             assert 'invalid native' in invoke('disassemble',binary,ok=False)
         binary.write_bytes(bytes([72,184,42,0,0,0,0,0,0,0,195]))
         assert '10  ret' in invoke('disassemble',binary)
+        source.write_text('(+ x y)')
+        invoke(source,binary)
+        assert 'verified' in invoke('check',binary)
+        for code in [[88,195],[80,195],[65,88,195],[73,137,192,195],[72,139,68,36,0,195]]:
+            binary.write_bytes(bytes(code))
+            invoke('check',binary,ok=False)
+        binary.write_bytes(bytes([72,199,192,42,0,0,0,195]))
+        invoke('check',binary)
         source.write_text('é')
         assert 'ASCII' in invoke(source,binary,ok=False)
         for text in ['0x','0x10000000000000000','0xfg','0xffextra','-0x1']:

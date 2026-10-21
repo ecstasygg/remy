@@ -1,5 +1,5 @@
 theory Frontend
-  imports Encoding
+  imports Checker
 begin
 
 fun finish :: "string \<Rightarrow> string list \<Rightarrow> string list" where
@@ -207,6 +207,13 @@ definition disassemble :: "string \<Rightarrow> bool \<times> string" where
   "disassemble bytes = (case blocks (map nat_of_char bytes) of
     None \<Rightarrow> (False,''invalid native block stream'' @ newline)
     | Some code \<Rightarrow> (True,listing 0 code))"
+
+definition validate :: "string \<Rightarrow> bool \<times> string" where
+  "validate bytes = (case blocks (map nat_of_char bytes) of
+    None \<Rightarrow> (False,''invalid native block stream'' @ newline)
+    | Some code \<Rightarrow> if audit (map snd code) 0 = Some 0
+      then (True,''native stack and register effects verified'' @ newline)
+      else (False,''invalid native stack or register effects'' @ newline))"
 
 datatype problem = Unexpected nat | Exhausted nat
 
