@@ -1,4 +1,7 @@
 from pathlib import Path
+import os
+import resource
+import signal
 import subprocess
 import tempfile
 
@@ -63,6 +66,26 @@ def main():
             invoke('check',binary,ok=False)
         binary.write_bytes(bytes([72,199,192,42,0,0,0,195]))
         invoke('check',binary)
+        source.write_text('(+ x y)')
+        binary.write_bytes(b'preserve')
+        binary.chmod(0o600)
+        invoke(source,binary,preexec_fn=lambda: os.umask(0))
+        assert binary.stat().st_mode & 0o777 == 0o600
+        def restricted():
+            signal.signal(signal.SIGXFSZ,signal.SIG_IGN)
+            resource.setrlimit(resource.RLIMIT_FSIZE,(1,1))
+        for args in [(source,binary),('vectors',source,binary)]:
+            binary.write_bytes(b'preserve')
+            invoke(*args,ok=False,preexec_fn=restricted)
+            assert binary.read_bytes() == b'preserve'
+            assert not list(binary.parent.glob('.binary.*'))
+        target = Path(directory) / 'folder'
+        target.mkdir()
+        invoke(source,target,ok=False)
+        assert not list(target.parent.glob('.folder.*'))
+        source.write_text('(+ x y)')
+        invoke(source,source)
+        assert source.read_bytes().endswith(bytes([195]))
         source.write_text('é')
         assert 'ASCII' in invoke(source,binary,ok=False)
         for text in ['0x','0x10000000000000000','0xfg','0xffextra','-0x1']:

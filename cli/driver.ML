@@ -14,12 +14,44 @@ fun read path =
     if size input > 65536 then raise Fail "source exceeds 64 KiB" else chars input
   end;
 
-fun write path bytes =
+fun write path data =
   let
-    val stream = BinIO.openOut path
+    val bytes = Byte.stringToBytes (text data)
+    val pid = SysWord.toString (Posix.Process.pidToWord (Posix.ProcEnv.getpid ()))
+    val prefix = OS.Path.concat (OS.Path.dir path, "." ^ OS.Path.file path ^ "." ^ pid ^ ".")
+    val defaultMode = Posix.FileSys.S.flags [Posix.FileSys.S.irusr, Posix.FileSys.S.iwusr,
+      Posix.FileSys.S.irgrp, Posix.FileSys.S.iwgrp, Posix.FileSys.S.iroth, Posix.FileSys.S.iwoth]
+    val mode = Posix.FileSys.S.intersect [Posix.FileSys.ST.mode (Posix.FileSys.stat path),
+      Posix.FileSys.S.flags [Posix.FileSys.S.irwxu, Posix.FileSys.S.irwxg, Posix.FileSys.S.irwxo]]
+      handle exn as OS.SysErr (_, SOME error) =>
+        if error = Posix.Error.noent then defaultMode else raise exn
+    fun reserve n =
+      if n = 128 then raise Fail "cannot reserve output file"
+      else
+        let
+          val temporary = prefix ^ Int.toString n
+        in
+          (temporary, Posix.FileSys.createf
+            (temporary, Posix.FileSys.O_WRONLY, Posix.FileSys.O.excl, mode))
+        end handle exn as OS.SysErr (_, SOME error) =>
+          if error = Posix.Error.exist then reserve (n + 1) else raise exn
+    val (temporary, fd) = reserve 0
+    val closed = ref false
+    fun close () = (Posix.IO.close fd; closed := true)
+    fun discard () =
+      ((if !closed then () else close ()) handle _ => ();
+       OS.FileSys.remove temporary handle _ => ())
+    fun loop offset =
+      if offset = Word8Vector.length bytes then ()
+      else
+        let
+          val count = Posix.IO.writeVec (fd, Word8VectorSlice.slice (bytes, offset, NONE))
+        in
+          if count = 0 then raise Fail "output write made no progress" else loop (offset + count)
+        end
   in
-    (BinIO.output (stream, Byte.stringToBytes (text bytes)); BinIO.closeOut stream)
-      handle exn => ((BinIO.closeOut stream handle _ => ()); raise exn)
+    (loop 0; close (); OS.FileSys.rename {old = temporary, new = path})
+      handle exn => (discard (); raise exn)
   end;
 
 fun output (ok, message) =
