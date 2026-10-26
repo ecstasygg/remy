@@ -86,6 +86,14 @@ def main():
         source.write_text('(+ x y)')
         invoke(source,source)
         assert source.read_bytes().endswith(bytes([195]))
+        invoke('-',binary,data='(+ x y)')
+        assert int(invoke('eval','-',3,4,0,data='(+ x y)')) == 7
+        invoke('vectors','-',binary,data='(+ x y)')
+        assert binary.stat().st_size == 16384
+        for data in ['(+ x)', ' ' * 65537]:
+            binary.write_bytes(b'preserve')
+            invoke('-',binary,data=data,ok=False)
+            assert binary.read_bytes() == b'preserve'
         source.write_text('é')
         assert 'ASCII' in invoke(source,binary,ok=False)
         for text in ['0x','0x10000000000000000','0xfg','0xffextra','-0x1']:

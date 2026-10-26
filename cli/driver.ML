@@ -6,10 +6,11 @@ fun text cs = String.implode (map (Char.chr o IntInf.toInt o Remy.ordinal) cs);
 
 fun read path =
   let
-    val stream = TextIO.openIn path
+    val stream = if path = "-" then TextIO.stdIn else TextIO.openIn path
+    fun close () = if path = "-" then () else TextIO.closeIn stream
     val input = TextIO.inputN (stream, 65537)
-      handle exn => (TextIO.closeIn stream; raise exn)
-    val _ = TextIO.closeIn stream
+      handle exn => (close (); raise exn)
+    val _ = close ()
   in
     if size input > 65536 then raise Fail "source exceeds 64 KiB" else chars input
   end;
@@ -71,7 +72,7 @@ fun main () =
   | ["check", binary] => output (Remy.validate (read binary))
   | ["disassemble", binary] => output (Remy.disassemble (read binary))
   | [source, destination] => emit destination (Remy.artifact (read source))
-  | _ => raise Fail "usage: remy check binary | remy disassemble binary | remy limits depth nodes stack source binary | remy source binary | remy vectors source data | remy eval source x y t")
+  | _ => raise Fail "usage: remy check binary | remy disassemble binary | remy limits depth nodes stack source binary | remy source binary | remy vectors source data | remy eval source x y t (source - reads standard input)")
   handle exn =>
     (TextIO.output (TextIO.stdErr, "remy: " ^ General.exnMessage exn ^ "\n");
      OS.Process.exit OS.Process.failure);
