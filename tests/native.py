@@ -1,5 +1,7 @@
 import ctypes
 import mmap
+import multiprocessing
+import resource
 from pathlib import Path
 import platform
 import random
@@ -48,6 +50,47 @@ def native(code):
     return function, image, thunk
 
 
+def worker(connection, code, vectors):
+    resource.setrlimit(resource.RLIMIT_CORE,(0,0))
+    try:
+        function, image, thunk = native(code)
+        results = [function(*vector) for vector in vectors]
+        del function
+        image.close()
+        thunk.close()
+        connection.send((True,results))
+    except BaseException as error:
+        connection.send((False,repr(error)))
+    finally:
+        connection.close()
+
+
+def execute(code, vectors):
+    context = multiprocessing.get_context('fork')
+    reader, writer = context.Pipe(duplex=False)
+    process = context.Process(target=worker,args=(writer,code,vectors))
+    process.start()
+    writer.close()
+    try:
+        if not reader.poll(30):
+            raise RuntimeError('native child exceeded 30 seconds')
+        try:
+            ok, result = reader.recv()
+        except EOFError:
+            process.join(1)
+            raise RuntimeError(f'native child failed with status {process.exitcode}') from None
+        process.join(1)
+        if not ok or process.exitcode != 0:
+            raise RuntimeError(f'native child failed: {result}, status {process.exitcode}')
+        return result
+    finally:
+        reader.close()
+        if process.is_alive():
+            process.terminate()
+        process.join()
+        process.close()
+
+
 def generate(rng, depth, names):
     if depth == 0 or rng.randrange(5) == 0:
         return rng.choice([0, 1, 63, 64, 65, MASK, 1 << 63, *names])
@@ -63,6 +106,12 @@ def generate(rng, depth, names):
 def main():
     if platform.system() != "Linux" or platform.machine() != "x86_64":
         raise RuntimeError("native differential tests require an x86-64 Linux host")
+    try:
+        execute(bytes.fromhex('0f 0b'),[(0,0,0)])
+    except RuntimeError as error:
+        assert 'status -4' in str(error), error
+    else:
+        raise AssertionError('invalid opcode did not kill the isolated child')
     rng = random.Random(0x52454D59)
     cases = [(op, "x", "y") for op in OPERATORS]
     cases += [(op, "x", 0) for op in ("+", "-", "or", "xor", "shl", "shr")]
@@ -82,20 +131,16 @@ def main():
             assert result.returncode == 0, (case, result.stderr)
             checked = subprocess.run([ROOT / ".build/remy", "check", binary],capture_output=True,text=True,timeout=30)
             assert checked.returncode == 0, (case,checked.stderr)
-            function, image, thunk = native(binary.read_bytes())
             vectors = [(a, b, a ^ b) for a in (0, 1, MASK, 1 << 63) for b in (0, 1, 63, 64, 65, MASK)]
             vectors += [tuple(rng.getrandbits(64) for _ in range(3)) for _ in range(24)]
-            for x, y, t in vectors:
+            results = execute(binary.read_bytes(),vectors)
+            for (x, y, t), actual in zip(vectors,results,strict=True):
                 expected = evaluate(case, {"x": x, "y": y, "t": t})
-                actual = function(x, y, t)
                 assert actual == expected, (source(case), x, y, t, expected, actual)
                 comparisons += 1
             result = subprocess.run([ROOT / ".build/remy", "eval", path, str(x), str(y), str(t)],
                                     capture_output=True, text=True, timeout=30)
             assert result.returncode == 0 and int(result.stdout) == expected, (case, result.stdout, result.stderr)
-            del function
-            image.close()
-            thunk.close()
         for bad in ("", "(+ x)", "(+ x y) 1", "(let a 3 b)", "(if 1 2)", "(let if 3 4)",
                     "18446744073709551616", "(+ x z)", "(div x y)", "é", " " * 65537):
             path.write_text(bad)
