@@ -1,4 +1,5 @@
 import ctypes
+import itertools
 import mmap
 import multiprocessing
 import resource
@@ -122,6 +123,13 @@ def main():
     cases += [("let", "a", ("+", "x", 3), ("+", "y", ("let", "b", "t", ("*", "a", "b")))),
               ("let", "x", "y", ("if", "t", ("+", "x", 1), ("-", "x", 1)))]
     cases += [generate(rng, 5, ["x", "y", "t"]) for _ in range(117)]
+    atoms = (0,1,MASK,'x','y','t')
+    exhaustive = list(atoms)
+    exhaustive += [(op,a,b) for op in OPERATORS for a,b in itertools.product(atoms,repeat=2)]
+    exhaustive += [('if',c,a,b) for c,a,b in itertools.product(atoms,repeat=3)]
+    exhaustive += [('let','a',value,body) for value in atoms for body in (*atoms,'a')]
+    assert len(exhaustive) == 588
+    cases += exhaustive
     comparisons = 0
     with tempfile.TemporaryDirectory() as directory:
         path, binary = Path(directory) / "source", Path(directory) / "binary"
