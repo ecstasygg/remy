@@ -23,9 +23,9 @@ Show(0);
 
 ## Correctness
 
-Each `let` pushes a binding onto the evaluation stack. [Compilation](src/Compiler.thy) adjusts variable offsets as intermediate values accumulate above those bindings and proves that execution leaves the result followed by the original stack whereas accepted programs stay within 512 evaluation words at every instruction boundary
+Each `let` pushes a binding onto the evaluation stack. [Compilation](src/core/Compiler.thy) adjusts variable offsets as intermediate values accumulate above those bindings and proves that execution leaves the result followed by the original stack whereas accepted programs stay within 512 evaluation words at every instruction boundary
 
-[Native lowering](src/Native.thy) puts the result in `rax` and preserves `r8`, `r9` and `rdx` which carry `x`, `y` and `t`. The temporary registers are `rax`, `rcx` and `rbx` while the [Encoding](src/Encoding.thy) proves decoder inversion and byte bounds for the emitted blocks including their immediate operands and stack displacements
+[Native lowering](src/core/Native.thy) puts the result in `rax` and preserves `r8`, `r9` and `rdx` which carry `x`, `y` and `t`. The temporary registers are `rax`, `rcx` and `rbx` while the [Encoding](src/core/Encoding.thy) proves decoder inversion and byte bounds for the emitted blocks including their immediate operands and stack displacements
 
 ![Source eval](media/correspondence.svg)
 

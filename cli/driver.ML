@@ -71,8 +71,9 @@ fun main () =
       emit destination (Remy.configured (chars depth) (chars nodes) (chars stack) (read source))
   | ["check", binary] => output (Remy.validate (read binary))
   | ["disassemble", binary] => output (Remy.disassemble (read binary))
+  | ["baseline", source, destination] => emit destination (Remy.baseline (read source))
   | [source, destination] => emit destination (Remy.artifact (read source))
-  | _ => raise Fail "usage: remy check binary | remy disassemble binary | remy limits depth nodes stack source binary | remy source binary | remy vectors source data | remy eval source x y t (source - reads standard input)")
+  | _ => raise Fail "usage: remy check binary | remy disassemble binary | remy baseline source binary | remy limits depth nodes stack source binary | remy source binary | remy vectors source data | remy eval source x y t (source - reads standard input)")
   handle exn =>
     (TextIO.output (TextIO.stdErr, "remy: " ^ General.exnMessage exn ^ "\n");
      OS.Process.exit OS.Process.failure);

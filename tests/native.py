@@ -122,6 +122,9 @@ def main():
     cases += [("let", "x1", ("+", "x", 1), ("*", "x1", "x1"))]
     cases += [("let", "a", ("+", "x", 3), ("+", "y", ("let", "b", "t", ("*", "a", "b")))),
               ("let", "x", "y", ("if", "t", ("+", "x", 1), ("-", "x", 1)))]
+    cases += [("-", "x", ("if", "t", ("+", "x", "y"), ("*", "y", "t"))),
+              ("shl", "x", ("let", "a", ("+", "y", "t"), ("-", "a", "x"))),
+              ("let", "a", "x", ("+", ("if", "y", "a", "t"), ("if", "t", "y", "a")))]
     cases += [generate(rng, 5, ["x", "y", "t"]) for _ in range(117)]
     atoms = (0,1,MASK,'x','y','t')
     exhaustive = list(atoms)

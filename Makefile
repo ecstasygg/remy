@@ -1,10 +1,10 @@
 ISABELLE ?= isabelle
 
-.PHONY: all check payload clean
+.PHONY: all check measure payload clean
 
 all: .build/ready
 
-.build/ready: ROOT $(wildcard src/*.thy) cli/driver.ML Makefile
+.build/ready: ROOT $(wildcard src/*.thy src/core/*.thy) cli/driver.ML Makefile
 	@test "$$('$(ISABELLE)' version)" = Isabelle2026
 	"$(ISABELLE)" build -D . -j 1 -o threads=1 -o parallel_proofs=0
 	"$(ISABELLE)" export -n -d . -O .build -x 'Remy.Export:code/remy.ML' Remy
@@ -14,6 +14,9 @@ all: .build/ready
 check: all
 	python3 tests/native.py
 	python3 tests/cli.py
+
+measure: all
+	python3 tests/measure.py
 
 payload: all
 	@mkdir -p .build/payload

@@ -53,6 +53,11 @@ def main():
         invoke(source,binary)
         listing = invoke('disassemble',binary)
         assert 'mov rax r9' in listing and 'arithmetic add' in listing and 'ret' in listing
+        assert 'push' not in listing and 'pop' not in listing
+        source.write_text('(- x (- y (- t x)))')
+        invoke(source,binary)
+        listing = invoke('disassemble',binary)
+        assert 'push rax' in listing and 'pop rcx' in listing
         for malformed in [b'',bytes([195,0]),bytes([72,199,192,0]),bytes([80])]:
             binary.write_bytes(malformed)
             assert 'invalid native' in invoke('disassemble',binary,ok=False)

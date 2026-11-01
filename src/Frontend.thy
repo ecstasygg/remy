@@ -1,5 +1,5 @@
 theory Frontend
-  imports Checker
+  imports Allocation
 begin
 
 fun finish :: "string \<Rightarrow> string list \<Rightarrow> string list" where
@@ -35,8 +35,11 @@ definition number :: "string \<Rightarrow> nat option" where
     if a = CHR ''0'' \<and> (b = CHR ''x'' \<or> b = CHR ''X'') then parse_digits 16 rest
     else parse_digits 10 s | _ \<Rightarrow> parse_digits 10 s)"
 
+lemma parse_digits_bound: "parse_digits base s = Some n \<Longrightarrow> n < 2 ^ 64"
+  by (auto simp only: parse_digits_def Let_def option.inject option.distinct split: if_splits)
+
 theorem number_bound: "number s = Some n \<Longrightarrow> n < 2 ^ 64"
-  by (auto simp: number_def parse_digits_def Let_def split: list.splits if_splits)
+  using parse_digits_bound by (auto simp: number_def split: list.splits if_splits)
 
 definition valid_name :: "string \<Rightarrow> bool" where
   "valid_name s = (case s of [] \<Rightarrow> False | c # cs \<Rightarrow>
@@ -269,15 +272,21 @@ definition source_error_with :: "limits \<Rightarrow> string \<Rightarrow> strin
 
 definition artifact_with :: "limits \<Rightarrow> string \<Rightarrow> (bool \<times> string) \<times> string" where
   "artifact_with lim s = (case prepare_with lim s of None \<Rightarrow> ((False,[]), source_error_with lim s)
-    | Some e \<Rightarrow> let opt = optimise e; bytes = executable e in
-      ((True, map char_of_nat bytes), decimal (nodes e) @ '' nodes -> '' @ decimal (nodes opt) @
-        '' nodes, '' @ decimal (length bytes) @ '' bytes, '' @ decimal (demand opt) @ '' stack words'' @ newline))"
+    | Some e \<Rightarrow> let opt = optimise e; code = allocated e; bytes = allocated_bytes e in
+      if audit code 0 = Some 0 \<and> list_all encodable code then
+        ((True, map char_of_nat bytes), decimal (nodes e) @ '' nodes -> '' @ decimal (nodes opt) @
+          '' nodes, '' @ decimal (length bytes) @ '' bytes, '' @ decimal (demand opt) @ '' stack words'' @ newline)
+      else ((False,[]),''allocated code exceeds native limits'' @ newline))"
 
 definition source_error :: "string \<Rightarrow> string" where
   "source_error = source_error_with defaults"
 
 definition artifact :: "string \<Rightarrow> (bool \<times> string) \<times> string" where
   "artifact = artifact_with defaults"
+
+definition baseline :: "string \<Rightarrow> (bool \<times> string) \<times> string" where
+  "baseline s = (case prepare s of None \<Rightarrow> ((False,[]),source_error s)
+    | Some e \<Rightarrow> ((True,map char_of_nat (executable e)),''stack backend'' @ newline))"
 
 definition configured :: "string \<Rightarrow> string \<Rightarrow> string \<Rightarrow> string \<Rightarrow> (bool \<times> string) \<times> string" where
   "configured depth count stacktext source = (case (number depth, number count, number stacktext) of
