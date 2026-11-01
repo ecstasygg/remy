@@ -31,6 +31,6 @@ Each `let` pushes a binding onto the evaluation stack. [Compilation](src/core/Co
 
 Arithmetic wraps modulo `2^64` and shifts mask their count to six bits
 
-Both branches of a nonconstant conditional run before selection which preserves the result because expressions have no side effects. The HolyC runner masks each pixel result to four bits for the TempleOS palette
+Nonconstant conditionals use forward `jz` and `jmp` instructions so only the selected arm runs. The validator checks both arms for matching stack heights and protected input registers. The HolyC runner masks each result to four bits for the TempleOS palette
 
 The execution theorem is relative to the instruction block model. Actual x86 execution + the HolyC calling bridge and the extracted runtime and the OS are outside its scope. Tests compare emitted code against an independent evaluator on Linux and against HOL results inside the recorded TempleOS guest

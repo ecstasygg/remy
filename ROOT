@@ -15,6 +15,7 @@ session Remy in src = Remybase +
   sessions "HOL-Library"
   theories
     Allocation
+    Branches
     Frontend
     Examples
     Export

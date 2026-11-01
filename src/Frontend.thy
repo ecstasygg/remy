@@ -1,5 +1,5 @@
 theory Frontend
-  imports Allocation
+  imports Branches
 begin
 
 fun finish :: "string \<Rightarrow> string list \<Rightarrow> string list" where
@@ -206,14 +206,33 @@ fun listing :: "nat \<Rightarrow> (nat list \<times> opcode) list \<Rightarrow> 
     ''  ['' @ concat (map (\<lambda>b. decimal b @ '' '') bytes) @ '']'' @ newline @
     listing (offset + length bytes) code"
 
+fun linear_listing :: "nat \<Rightarrow> opcode list \<Rightarrow> string" where
+  "linear_listing offset [] = []"
+| "linear_listing offset (op # code) = decimal offset @ ''  '' @ mnemonic op @ newline @
+    linear_listing (offset + length (encode op)) code"
+
+fun flowlisting :: "nat \<Rightarrow> flow \<Rightarrow> string" where
+  "flowlisting offset (Basic code) = linear_listing offset code"
+| "flowlisting offset (Sequence a b) = flowlisting offset a @
+    flowlisting (offset + length (flowbytes a)) b"
+| "flowlisting offset (Choice a b) = decimal offset @ ''  test rax rax'' @ newline @
+    decimal (offset + 3) @ ''  jz '' @ decimal (offset + 14 + length (flowbytes a)) @ newline @
+    flowlisting (offset + 9) a @ decimal (offset + 9 + length (flowbytes a)) @ ''  jmp '' @
+    decimal (offset + length (flowbytes (Choice a b))) @ newline @
+    flowlisting (offset + 14 + length (flowbytes a)) b"
+
 definition disassemble :: "string \<Rightarrow> bool \<times> string" where
   "disassemble bytes = (case blocks (map nat_of_char bytes) of
-    None \<Rightarrow> (False,''invalid native block stream'' @ newline)
+    None \<Rightarrow> (case inspect (map nat_of_char bytes) of
+      None \<Rightarrow> (False,''invalid native block stream'' @ newline)
+      | Some code \<Rightarrow> (True,flowlisting 0 code @ decimal (length (flowbytes code)) @ ''  ret'' @ newline))
     | Some code \<Rightarrow> (True,listing 0 code))"
 
 definition validate :: "string \<Rightarrow> bool \<times> string" where
   "validate bytes = (case blocks (map nat_of_char bytes) of
-    None \<Rightarrow> (False,''invalid native block stream'' @ newline)
+    None \<Rightarrow> (case inspect (map nat_of_char bytes) of
+      None \<Rightarrow> (False,''invalid native block stream'' @ newline)
+      | Some code \<Rightarrow> (True,''native branch, stack and register effects verified'' @ newline))
     | Some code \<Rightarrow> if audit (map snd code) 0 = Some 0
       then (True,''native stack and register effects verified'' @ newline)
       else (False,''invalid native stack or register effects'' @ newline))"
@@ -272,8 +291,8 @@ definition source_error_with :: "limits \<Rightarrow> string \<Rightarrow> strin
 
 definition artifact_with :: "limits \<Rightarrow> string \<Rightarrow> (bool \<times> string) \<times> string" where
   "artifact_with lim s = (case prepare_with lim s of None \<Rightarrow> ((False,[]), source_error_with lim s)
-    | Some e \<Rightarrow> let opt = optimise e; code = allocated e; bytes = allocated_bytes e in
-      if audit code 0 = Some 0 \<and> list_all encodable code then
+    | Some e \<Rightarrow> let opt = optimise e; code = branching e; bytes = flowbytes code @ [195] in
+      if flowaudit code 0 = Some 0 \<and> flowvalid code then
         ((True, map char_of_nat bytes), decimal (nodes e) @ '' nodes -> '' @ decimal (nodes opt) @
           '' nodes, '' @ decimal (length bytes) @ '' bytes, '' @ decimal (demand opt) @ '' stack words'' @ newline)
       else ((False,[]),''allocated code exceeds native limits'' @ newline))"

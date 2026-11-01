@@ -58,6 +58,21 @@ def main():
         invoke(source,binary)
         listing = invoke('disassemble',binary)
         assert 'push rax' in listing and 'pop rcx' in listing
+        source.write_text('(if x (+ y 7) (- t 9))')
+        invoke(source,binary)
+        listing = invoke('disassemble',binary)
+        assert 'jz ' in listing and 'jmp ' in listing and 'conditional ' not in listing
+        invoke('check',binary)
+        original = binary.read_bytes()
+        branch = original.index(bytes.fromhex('48 85 c0 0f 84'))
+        for offset in (0,4,0x7fffffff,0xffffffff):
+            damaged = bytearray(original)
+            damaged[branch+5:branch+9] = offset.to_bytes(4,'little')
+            binary.write_bytes(damaged)
+            invoke('check',binary,ok=False)
+        for cut in range(branch+1,branch+9):
+            binary.write_bytes(original[:cut]+bytes([195]))
+            invoke('check',binary,ok=False)
         for malformed in [b'',bytes([195,0]),bytes([72,199,192,0]),bytes([80])]:
             binary.write_bytes(malformed)
             assert 'invalid native' in invoke('disassemble',binary,ok=False)

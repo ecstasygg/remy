@@ -136,6 +136,23 @@ def main():
     comparisons = 0
     with tempfile.TemporaryDirectory() as directory:
         path, binary = Path(directory) / "source", Path(directory) / "binary"
+        path.write_text('(if x (+ y 7) (- t 9))')
+        subprocess.run([ROOT / '.build/remy',path,binary],check=True,capture_output=True)
+        conditional = binary.read_bytes()
+        start = conditional.index(bytes.fromhex('48 85 c0 0f 84'))
+        otherwise = start + 9 + int.from_bytes(conditional[start+5:start+9],'little')
+        damaged = bytearray(conditional)
+        damaged[otherwise:otherwise+2] = bytes.fromhex('0f 0b')
+        assert execute(bytes(damaged),[(1,3,2)]) == [10]
+        try:
+            execute(bytes(damaged),[(0,3,2)])
+        except RuntimeError as error:
+            assert 'status -4' in str(error), error
+        else:
+            raise AssertionError('selected poisoned branch did not execute')
+        damaged = bytearray(conditional)
+        damaged[start+9:start+11] = bytes.fromhex('0f 0b')
+        assert execute(bytes(damaged),[(0,3,2)]) == [MASK-6]
         for case in cases:
             path.write_text(source(case))
             result = subprocess.run([ROOT / ".build/remy", path, binary], capture_output=True, text=True, timeout=30)
