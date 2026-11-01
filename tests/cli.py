@@ -25,6 +25,9 @@ def main():
             assert int(invoke('eval',source,'0','0','0')) == expected, text
         source.write_text('(+ x y)')
         assert int(invoke('eval',source,'0xFF','0x1','0x0')) == 256
+        invoke(source,binary)
+        assert int(invoke('simulate',binary,'0xFF','0x1','0x0')) == 256
+        invoke('simulate',binary,'invalid','0','0',ok=False)
         source.write_text('(let x1 7 (let x1 (+ x1 2) (* x1 x1)))')
         assert int(invoke('eval',source,'0','0','0')) == 81
         source.write_text('(let 1x 3 1x)')

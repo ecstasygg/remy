@@ -1,5 +1,5 @@
 theory Frontend
-  imports Branches
+  imports X86
 begin
 
 fun finish :: "string \<Rightarrow> string list \<Rightarrow> string list" where
@@ -303,6 +303,20 @@ definition source_error :: "string \<Rightarrow> string" where
 definition artifact :: "string \<Rightarrow> (bool \<times> string) \<times> string" where
   "artifact = artifact_with defaults"
 
+theorem artifact_execution:
+  assumes "artifact source = ((True,bytes),report)"
+  shows "\<exists>e d. prepare source = Some e \<and>
+    bytes = map char_of_nat (flowbytes (branching e) @ [195]) \<and>
+    executes64 (flowbytes (branching e)) c d \<and>
+    registers (state64 d) Rax = evaluate e [] (inputs (state64 c)) \<and>
+    stack (state64 d) = stack (state64 c) \<and> inputs (state64 d) = inputs (state64 c)"
+proof -
+  obtain e where e: "prepare source = Some e" "flowvalid (branching e)"
+    "bytes = map char_of_nat (flowbytes (branching e) @ [195])"
+    using assms by (auto simp: artifact_def artifact_with_def prepare_def Let_def split: option.splits if_splits)
+  show ?thesis using compiled_execution[OF prepare_scoped[OF e(1)] e(2), of c] e by blast
+qed
+
 definition baseline :: "string \<Rightarrow> (bool \<times> string) \<times> string" where
   "baseline s = (case prepare s of None \<Rightarrow> ((False,[]),source_error s)
     | Some e \<Rightarrow> ((True,map char_of_nat (executable e)),''stack backend'' @ newline))"
@@ -331,6 +345,21 @@ definition reference :: "string \<Rightarrow> string \<Rightarrow> string \<Righ
   "reference source x y t = (case prepare source of None \<Rightarrow> (False,source_error source) | Some e \<Rightarrow>
     case (number x, number y, number t) of (Some a,Some b,Some c) \<Rightarrow>
       (True, decimal (unat (evaluate e [] (\<lambda>v. word_of_nat (case v of X \<Rightarrow> a | Y \<Rightarrow> b | T \<Rightarrow> c)))) @ newline)
+    | _ \<Rightarrow> (False,''invalid input'' @ newline))"
+
+definition initial64 :: "nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> processor" where
+  "initial64 x y t = \<lparr>state64 = \<lparr>registers = (\<lambda>r. word_of_nat
+    (if r = R8 then x else if r = R9 then y else if r = Rdx then t else 0)), stack = [0]\<rparr>,
+    pointer64 = 65536, zero64 = None, carry64 = None\<rparr>"
+
+definition simulate :: "string \<Rightarrow> string \<Rightarrow> string \<Rightarrow> string \<Rightarrow> bool \<times> string" where
+  "simulate code x y t = (if \<not> fst (validate code) then (False,''invalid native image'' @ newline) else
+    case (number x,number y,number t) of (Some a,Some b,Some c) \<Rightarrow>
+      (case simulate64 (Suc (length code)) (map nat_of_char code) (initial64 a b c) of
+        None \<Rightarrow> (False,''unsupported or incomplete x86 execution'' @ newline)
+        | Some q \<Rightarrow> if stack (state64 q) = []
+          then (True,decimal (unat (registers (state64 q) Rax)) @ newline)
+          else (False,''return frame was not consumed'' @ newline))
     | _ \<Rightarrow> (False,''invalid input'' @ newline))"
 
 end

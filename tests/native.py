@@ -169,6 +169,9 @@ def main():
             result = subprocess.run([ROOT / ".build/remy", "eval", path, str(x), str(y), str(t)],
                                     capture_output=True, text=True, timeout=30)
             assert result.returncode == 0 and int(result.stdout) == expected, (case, result.stdout, result.stderr)
+            simulated = subprocess.run([ROOT / '.build/remy', 'simulate', binary, str(x), str(y), str(t)],
+                                       capture_output=True, text=True, timeout=30)
+            assert simulated.returncode == 0 and int(simulated.stdout) == expected, (case, simulated.stdout, simulated.stderr)
         for bad in ("", "(+ x)", "(+ x y) 1", "(let a 3 b)", "(if 1 2)", "(let if 3 4)",
                     "18446744073709551616", "(+ x z)", "(div x y)", "é", " " * 65537):
             path.write_text(bad)
