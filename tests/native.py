@@ -178,7 +178,7 @@ def main():
             binary.write_bytes(b"preserve")
             result = subprocess.run([ROOT / ".build/remy", path, binary], capture_output=True, timeout=30)
             assert result.returncode != 0 and binary.read_bytes() == b"preserve", bad
-    print(f"{len(cases)} programs, {comparisons} native comparisons, HOL reference checks and 11 rejection cases passed")
+    print(f"{len(cases)} programs, {comparisons} native comparisons, byte interpreter and HOL reference checks, 11 rejection cases passed")
 
 
 if __name__ == "__main__":

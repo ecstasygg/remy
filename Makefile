@@ -1,6 +1,6 @@
 ISABELLE ?= isabelle
 
-.PHONY: all check measure payload clean
+.PHONY: all check measure payload guest clean
 
 all: .build/ready
 
@@ -14,6 +14,7 @@ all: .build/ready
 check: all
 	python3 tests/native.py
 	python3 tests/cli.py
+	python3 tests/live.py
 
 measure: all
 	python3 tests/measure.py
@@ -22,6 +23,9 @@ payload: all
 	@mkdir -p .build/payload
 	@set -e; for name in Rings Weave Cells; do .build/remy examples/$$name.remy .build/payload/$$name.BIN; .build/remy vectors examples/$$name.remy .build/payload/$$name.DAT; cp examples/$$name.remy .build/payload/$$name.TXT; done
 	cp guest/Remy.HC .build/payload/Remy.HC
+
+guest: payload
+	python3 tests/guest.py "$(TEMPLE_ISO)"
 
 clean:
 	rm -rf .build

@@ -16,7 +16,9 @@ session Remy in src = Remybase +
   theories
     Allocation
     Branches
+    Bounds
     X86
     Frontend
+    Delivery
     Examples
     Export
